@@ -1,6 +1,6 @@
 import * as TE from "fp-ts/lib/TaskEither";
 import * as E from "fp-ts/lib/Either";
-import { pipe } from "fp-ts/lib/pipeable";
+import { flow } from "fp-ts/lib/function";
 import { getSwagger } from "./read";
 import { generate } from "./generate";
 import { write } from "./write";
@@ -23,10 +23,9 @@ export function program({
   type,
   patchSource
 }: ProgramConfig): TE.TaskEither<Error, void> {
-  return pipe(
-    source,
+  return flow(
     getSwagger(sourceToEither(patchSource)),
     TE.chainEitherK(generate({ exitOnInvalidType, type })),
     TE.chain(write(destination))
-  );
+  )(source);
 }

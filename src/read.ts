@@ -6,10 +6,9 @@ import path from "path";
 import * as IE from "fp-ts/lib/IOEither";
 import * as TE from "fp-ts/lib/TaskEither";
 import * as E from "fp-ts/lib/Either";
-import { pipe } from "fp-ts/lib/pipeable";
+import { constant, flow } from "fp-ts/lib/function";
 import { Swagger, Schemas } from "./models/Swagger";
 import { doIf, patch, doIfElse } from "./services/utils";
-import { constant } from "fp-ts/lib/function";
 
 function isUrl(pathOrUrl: string): boolean {
   return pathOrUrl.indexOf("https://") !== -1;
@@ -41,32 +40,29 @@ function getContentFromPath<T>(file: string): IE.IOEither<Error, T> {
 }
 
 function getContent<T>(source: string): TE.TaskEither<Error, T> {
-  return pipe(
-    source,
-    doIfElse(
-      isUrl,
-      source => getContentFromURL<T>(source),
-      source => TE.fromIOEither(getContentFromPath<T>(source))
-    )
-  );
+  return doIfElse(
+    isUrl,
+    source => getContentFromURL<T>(source),
+    source => TE.fromIOEither(getContentFromPath<T>(source))
+  )(source);
 }
 
 function patchSwagger(patchSource: E.Either<string, Partial<Schemas>>) {
   return function(swagger: Swagger): TE.TaskEither<Error, Swagger> {
-    return pipe(
-      patchSource,
+    return flow(
+      () => patchSource,
       E.fold(source => getContent<Partial<Swagger>>(source), TE.right),
       TE.map(patch(swagger))
-    );
+    )();
   };
 }
 
 export function getSwagger(patchSource?: E.Either<string, Partial<Schemas>>) {
   return function(source: string): TE.TaskEither<Error, Swagger> {
-    return pipe(
-      source,
+    return flow(
+      () => source,
       source => getContent<Swagger>(source),
       doIf(constant(patchSource != null), TE.chain(patchSwagger(patchSource!)))
-    );
+    )();
   };
 }

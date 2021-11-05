@@ -1,5 +1,5 @@
-import { constant, flow, not } from "fp-ts/lib/function";
-import { pipe } from "fp-ts/lib/pipeable";
+import { constant, flow } from "fp-ts/lib/function";
+import { not } from "fp-ts/lib/Predicate";
 import { Generator } from "../models/Generator";
 import {
   doIf,
@@ -24,13 +24,12 @@ export const typeScriptGenerator: Generator = {
   getTypeObject: flow(join(","), surround("{", "}")),
   getTypeReference: toPascalCase,
   getProperty: (key, isRequired) =>
-    pipe(
-      key,
+    flow(
       surround('"', '"'),
       doIf(not(constant(isRequired)), suffix("?")),
       suffix(":"),
       prefix
-    ),
+    )(key),
   getTypeUnknown: constant("unknown"),
   addHeader: prefix('"use strict";\n'),
   combineTypes: join(";"),

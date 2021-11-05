@@ -1,7 +1,7 @@
 import fs from "fs";
 import prettier from "prettier";
 import * as TE from "fp-ts/lib/TaskEither";
-import { pipe } from "fp-ts/lib/pipeable";
+import { flow } from "fp-ts/lib/function";
 
 function prettify(types: string): string {
   return prettier.format(types);
@@ -18,7 +18,7 @@ function writeToFile(filename: string) {
 
 function write(filename: string) {
   return function(types: string): TE.TaskEither<Error, void> {
-    return pipe(types, prettify, writeToFile(filename));
+    return flow(prettify, writeToFile(filename))(types);
   };
 }
 

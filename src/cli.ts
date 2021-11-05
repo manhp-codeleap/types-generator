@@ -3,7 +3,7 @@ import inquirer from "inquirer";
 import * as TE from "fp-ts/lib/TaskEither";
 import * as T from "fp-ts/lib/Task";
 import * as E from "fp-ts/lib/Either";
-import { pipe } from "fp-ts/lib/pipeable";
+import { flow } from "fp-ts/lib/function";
 import { CliConfig } from "./models/CliConfig";
 
 function parseArgumentsIntoOptions(rawArgs: string[]): Partial<CliConfig> {
@@ -87,17 +87,16 @@ function getAnswers(
 function promptForMissingOptions(
   options: Partial<CliConfig>
 ): TE.TaskEither<Error, CliConfig> {
-  return pipe(
-    options,
+  return flow(
     getQuestions,
     getAnswers,
     T.map(answers => ({ ...options, ...answers })),
     T.map(checkOptions)
-  );
+  )(options);
 }
 
 function cli(args: string[]): TE.TaskEither<Error, CliConfig> {
-  return pipe(args, parseArgumentsIntoOptions, promptForMissingOptions);
+  return flow(parseArgumentsIntoOptions, promptForMissingOptions)(args);
 }
 
 export { cli };

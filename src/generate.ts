@@ -2,7 +2,6 @@
 import { Swagger, Property } from "./models/Swagger";
 import * as E from "fp-ts/lib/Either";
 import * as A from "fp-ts/lib/Array";
-import { pipe } from "fp-ts/lib/pipeable";
 import { Options } from "./models/Options";
 import { flow, identity, constant } from "fp-ts/lib/function";
 import { doIf, prefix, replace } from "./services/utils";
@@ -27,7 +26,7 @@ import { codecGenerator } from "./generators/codecGenerator";
 
 type TypeResult = E.Either<Error, string>;
 
-const traverseArray = A.array.traverse(E.either);
+const traverseArray = A.Traversable.traverse(E.Applicative);
 
 function getGenerator({ type }: Options): Generator<unknown> {
   return {
@@ -125,35 +124,31 @@ const getTypeRef = getPropertyHandler(
 const getTypeAllOf = getPropertyHandler(
   isValidAllOf,
   options => (property): TypeResult =>
-    pipe(
-      traverseArray(property.allOf, getType(options)),
-      E.map(getGenerator(options).getTypeAllOf)
+    E.map(getGenerator(options).getTypeAllOf)(
+      traverseArray(property.allOf, getType(options))
     )
 );
 const getTypeOneOf = getPropertyHandler(
   isOneOf,
   options => (property): TypeResult =>
-    pipe(
-      traverseArray(property.oneOf, getType(options)),
-      E.map(getGenerator(options).getTypeOneOf)
+    E.map(getGenerator(options).getTypeOneOf)(
+      traverseArray(property.oneOf, getType(options))
     )
 );
 const getTypeAnyOf = getPropertyHandler(
   isAnyOf,
   options => (property): TypeResult =>
-    pipe(
-      traverseArray(property.anyOf, getType(options)),
-      E.map(getGenerator(options).getTypeAnyOf)
+    E.map(getGenerator(options).getTypeAnyOf)(
+      traverseArray(property.anyOf, getType(options))
     )
 );
 const getTypeArray = getPropertyHandler(
   isArray,
   options => (property): TypeResult =>
-    pipe(
-      property.items,
+    flow(
       getType(options),
       E.map(getGenerator(options).getTypeArray)
-    )
+    )(property.items)
 );
 const getTypeEnum = getPropertyHandler(
   isEnum,
@@ -177,12 +172,11 @@ const getTypeBoolean = getPropertyHandler(
 const getTypeObject = getPropertyHandler(
   isObject,
   options => (property): TypeResult =>
-    pipe(
+    E.map(getGenerator(options).getTypeObject)(
       traverseArray(
         Object.entries(property.properties || {}),
         ([key, childProperty]) =>
-          pipe(
-            childProperty,
+          flow(
             getType(options),
             E.map(
               getGenerator(options).getProperty(
@@ -190,16 +184,14 @@ const getTypeObject = getPropertyHandler(
                 isRequired(key, property.required)
               )
             )
-          )
-      ),
-      E.map(getGenerator(options).getTypeObject)
+          )(childProperty)
+      )
     )
 );
 
 function getType(options: Options) {
   return function(property: Property): TypeResult {
-    return pipe(
-      property,
+    return flow(
       fixErrorsOnProperty,
       flow(
         getTypeRef(options),
@@ -218,7 +210,7 @@ function getType(options: Options) {
       ),
       E.fold(identity, getInvalidType(options)),
       E.map(doIf(isNullable(property), getGenerator(options).makeTypeNullable))
-    );
+    )(property);
   };
 }
 
@@ -232,12 +224,9 @@ function getTypesFromSchemas(options: Options) {
   return function(schemas: {
     [key: string]: Property;
   }): E.Either<Error, string[]> {
-    return pipe(
-      traverseArray(Object.entries(schemas), ([key, property]) =>
-        pipe(
-          getType(options)(property),
-          E.map(getGenerator(options).getTypeDefinition(key))
-        )
+    return traverseArray(Object.entries(schemas), ([key, property]) =>
+      E.map(getGenerator(options).getTypeDefinition(key))(
+        getType(options)(property)
       )
     );
   };
@@ -260,8 +249,8 @@ function baseDefinitionsToString(
 
 function definitionsToString(options: Options) {
   return (schemas: { [key: string]: Property }): E.Either<Error, string> => {
-    return pipe(
-      baseDefinitionsToString(options)(schemas),
+    return flow(
+      () => baseDefinitionsToString(options)(schemas),
       doIf(
         constant(options.type === "CodecIoTs"),
         flow(
@@ -271,7 +260,7 @@ function definitionsToString(options: Options) {
           )
         )
       )
-    );
+    )();
   };
 }
 
